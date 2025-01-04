@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { Socket } from 'socket.io-client';
 
 
@@ -20,7 +20,7 @@ import { toast } from 'react-toastify';
 import { FaMicrophone, FaMicrophoneSlash } from "react-icons/fa";
 import { IoCall } from "react-icons/io5";
 import { FaCopy } from "react-icons/fa6";
-import { MdScreenShare, MdDraw, MdMessage, MdClose, MdSend } from "react-icons/md";
+import { MdDraw, MdMessage, MdClose, MdSend } from "react-icons/md";
 import { BsFillCameraVideoFill, BsFillCameraVideoOffFill } from "react-icons/bs";
 
 
@@ -62,7 +62,7 @@ export default function Meet({ socket }: { socket: Socket }) {
     const [users, setUsers] = useState<userType>({});
     const [username, setUsername] = useState("")
     const [constraints, setConstraints] = useState({ video: true, audio: false })
-    const [screenShare, setScreenShare] = useState(false)
+    // const [screenShare, setScreenShare] = useState(false)
     const [messagesSectionOpen, setMessagesSectionOpen] = useState(false)
     const [messagesList, setMessagesList] = useState<messageType[]>([])
 
@@ -321,10 +321,6 @@ export default function Meet({ socket }: { socket: Socket }) {
 
     }
 
-    // todo
-    function toggleScreenShare() {
-        setScreenShare(pre => !pre)
-    }
 
 
 
