@@ -110,7 +110,11 @@ export default function Meet({ socket, room }: { socket: Socket, room: string })
     }
 
     function addUser(id: string, name: string) {
-        setUsers(pre => ({ ...pre, [id]: { id, name } }))
+
+        setUsers(pre => {
+            if (pre['main']?.id == id) return pre
+            return { ...pre, [id]: { id, name } }
+        })
     }
 
     function addStreamToUser(id: string, stream: MediaStream | undefined) {
@@ -153,7 +157,6 @@ export default function Meet({ socket, room }: { socket: Socket, room: string })
 
     async function handleUserConnectionReply(id: string, name: string) {
         addUser(id, name)
-        toast(name + ' Joined')
         await createConnection(id)
         await createOffer(id)
 
