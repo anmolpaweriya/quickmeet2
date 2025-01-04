@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom'
 import { Socket } from 'socket.io-client';
 
 
@@ -14,7 +13,7 @@ import {
 } from "@/components/ui/card"
 import { Input } from '@/components/ui/input';
 import { toast } from 'react-toastify';
-
+import { InfinitySpin } from 'react-loader-spinner'
 
 //icons
 import { FaMicrophone, FaMicrophoneSlash } from "react-icons/fa";
@@ -48,9 +47,7 @@ type messageType = {
 }
 
 
-export default function Meet({ socket }: { socket: Socket }) {
-
-    const { room } = useParams();
+export default function Meet({ socket, room }: { socket: Socket, room: string }) {
 
     const messageInputRef = useRef<HTMLInputElement>(null);
     const usernameInputRef = useRef<HTMLInputElement>(null);
@@ -163,6 +160,7 @@ export default function Meet({ socket }: { socket: Socket }) {
         peerConnections.current[id] = peer
 
         peer.ontrack = event => {
+            console.log(event.streams)
             renderStream(id, event.streams[0])
             addStreamToUser(id, event.streams[0])
         }
@@ -219,6 +217,8 @@ export default function Meet({ socket }: { socket: Socket }) {
         document.querySelector(`#id-${id} video`)?.remove()
         if (!stream) return
         const video = document.createElement('video')
+        if (socket.id == id)
+            video.muted = true
         video.onloadedmetadata = () => video.play()
         video.srcObject = stream
 
@@ -411,154 +411,165 @@ export default function Meet({ socket }: { socket: Socket }) {
         </div>
 
     return (
-        <main
-            className='w-full h-dvh box-border flex transition-all max-sm:flex-col'
-        >
+        <>
+            {!socket.connected &&
+                <div className='w-full h-full absolute top-0 left-0 z-10 bg-[#181818] flex justify-center items-center  '>
+                    <InfinitySpin
+                        color='#fff'
 
-            <section className='h-full w-full box-border p-4'>
+                    />
+                </div>
+            }
+            <main
+                className='w-full h-dvh box-border flex transition-all max-sm:flex-col'
+            >
 
-                <div className='w-full h-full grid grid-rows-[auto_75px]'>
+                <section className='h-full w-full box-border p-4'>
+
+                    <div className='w-full h-full grid grid-rows-[auto_75px]'>
 
 
-                    <div className='bg-[#333] rounded-lg overflow-hidden w-full h-full relative' id={`id-${users["main"]?.id}`}>
+                        <div className='bg-[#333] rounded-lg overflow-hidden w-full h-full relative' id={`id-${users["main"]?.id}`}>
 
 
-                        <p className='absolute bottom-2 left-2 text-3xl'>
-                            {users["main"]?.name}
-                            {users["main"]?.id == socket.id ? " (You)" : ""}
-                        </p>
-                    </div>
-                    <div className='w-full h-full flex justify-center items-center gap-5 max-sm:gap-3'>
-                        {/* <button className={'rounded-full w-[50px] h-[50px] flex justify-center items-center text-xl active:scale-95 transition-all ' +
+                            <p className='absolute bottom-2 left-2 text-3xl'>
+                                {users["main"]?.name}
+                                {users["main"]?.id == socket.id ? " (You)" : ""}
+                            </p>
+                        </div>
+                        <div className='w-full h-full flex justify-center items-center gap-5 max-sm:gap-3'>
+                            {/* <button className={'rounded-full w-[50px] h-[50px] flex justify-center items-center text-xl active:scale-95 transition-all ' +
                             (screenShare ? "bg-blue-400 text-black" : "bg-[#444]")
                         }
                             onClick={toggleScreenShare}
                         >
                             <MdScreenShare />
                         </button> */}
-                        <button className={'rounded-full w-[50px] h-[50px] flex justify-center items-center text-xl active:scale-95 transition-all ' +
-                            (constraints.video ? "bg-blue-400 text-black" : "bg-[#444]")
-                        }
-                            onClick={toggleVideo}
-                        >
-                            {constraints.video
-                                ?
-                                <BsFillCameraVideoFill />
-                                :
-                                <BsFillCameraVideoOffFill />
+                            <button className={'rounded-full w-[50px] h-[50px] flex justify-center items-center text-xl active:scale-95 transition-all ' +
+                                (constraints.video ? "bg-blue-400 text-black" : "bg-[#444]")
                             }
+                                onClick={toggleVideo}
+                            >
+                                {constraints.video
+                                    ?
+                                    <BsFillCameraVideoFill />
+                                    :
+                                    <BsFillCameraVideoOffFill />
+                                }
 
-                        </button>
-                        <button className={'rounded-full w-[50px] h-[50px] flex justify-center items-center text-xl  active:scale-95 transition-all ' +
-                            (constraints.audio ? "bg-blue-400 text-black" : "bg-[#444]")
-                        }
-                            onClick={toggleAudio}
-                        >
-                            {constraints.audio
-                                ?
-                                <FaMicrophone />
-                                :
-                                <FaMicrophoneSlash />
+                            </button>
+                            <button className={'rounded-full w-[50px] h-[50px] flex justify-center items-center text-xl  active:scale-95 transition-all ' +
+                                (constraints.audio ? "bg-blue-400 text-black" : "bg-[#444]")
                             }
+                                onClick={toggleAudio}
+                            >
+                                {constraints.audio
+                                    ?
+                                    <FaMicrophone />
+                                    :
+                                    <FaMicrophoneSlash />
+                                }
 
-                        </button>
-                        <a
-                            href='/draw/index.html'
-                            target='_blank'
-                            className='rounded-full w-[50px] h-[50px] bg-[#444] flex justify-center items-center text-xl  active:scale-95 transition-all'
-                        ><MdDraw /></a>
-                        <button
-                            onClick={() => setMessagesSectionOpen(pre => !pre)}
-                            className={'rounded-full w-[50px] h-[50px] flex justify-center items-center text-xl active:scale-95 transition-all '
-                                + (messagesSectionOpen ? "bg-blue-400 text-black" : "bg-[#444]")
+                            </button>
+                            <a
+                                href='/draw/index.html'
+                                target='_blank'
+                                className='rounded-full w-[50px] h-[50px] bg-[#444] flex justify-center items-center text-xl  active:scale-95 transition-all'
+                            ><MdDraw /></a>
+                            <button
+                                onClick={() => setMessagesSectionOpen(pre => !pre)}
+                                className={'rounded-full w-[50px] h-[50px] flex justify-center items-center text-xl active:scale-95 transition-all '
+                                    + (messagesSectionOpen ? "bg-blue-400 text-black" : "bg-[#444]")
 
-                            }
+                                }
 
-                        ><MdMessage /></button>
-                        <button
-                            onClick={copyMeetLink}
-                            className='rounded-full w-[50px] h-[50px] bg-[#444] flex justify-center items-center text-xl active:scale-95 transition-all'
-                        ><FaCopy /></button>
-                        <a
-                            href='/'
-                            className='rounded-full w-[50px] h-[50px] bg-red-500 flex justify-center items-center text-xl  active:scale-95 transition-all'
-                        ><IoCall /></a>
+                            ><MdMessage /></button>
+                            <button
+                                onClick={copyMeetLink}
+                                className='rounded-full w-[50px] h-[50px] bg-[#444] flex justify-center items-center text-xl active:scale-95 transition-all'
+                            ><FaCopy /></button>
+                            <a
+                                href='/'
+                                className='rounded-full w-[50px] h-[50px] bg-red-500 flex justify-center items-center text-xl  active:scale-95 transition-all'
+                            ><IoCall /></a>
+                        </div>
                     </div>
-                </div>
 
-            </section>
-            <section
-                className={' h-full transition-all overflow-x-hidden overflow-y-scroll box-border  flex flex-col gap-3  max-sm:flex-row max-sm:overflow-x-scroll py-5  max-sm:py-0'
-                    + (Object.keys(users).length > 1 ? " w-[300px] max-sm:w-full max-sm:h-[150px] px-2 " : " w-0 max-sm:h-0 ")
-                }
-                id="usersParentSection"
-            >
-
-                {Object.keys(users).map(key => {
-                    const user = users[key];
-                    if (key == "main") return;
-
-                    return <div
-                        className='flex-none sm:w-full box-border rounded-md bg-[#333] h-[100px] relative hover:scale-95 transition-all max-sm:h-full max-sm:w-[200px]'
-                        key={user.id}
-                        id={`id-${user.id}`}
-                        onClick={() => setMainStream(user.id)}
-                    >
-
-                        <p className='absolute bottom-2 left-2 text-lg'>
-                            {user.name}
-                            {user.id == socket.id ? " (You)" : ""}
-                        </p>
-                    </div>
-                })}
-            </section>
-
-            <section
-                className={'absolute right-0 h-full top-0 bg-[#fff] backdrop-blur-xl sm:rounded-l-xl  grid grid-rows-[50px_auto_75px] transition-all overflow-hidden '
-                    + (messagesSectionOpen ? "w-[400px] max-sm:w-full " : "w-0")
-
-                }
-            >
-
-
-                <div className='h-full w-full flex justify-end '>
-                    <button
-                        onClick={() => setMessagesSectionOpen(false)}
-                        className='mr-5 text-2xl active:scale-90 text-black'
-                    ><MdClose /></button>
-                </div>
-                <ul className='w-full h-full flex flex-col gap-2'>
-
-                    {
-                        messagesList.map((message, index) => {
-                            return <li key={index} className="px-4 py-3 hover:bg-gray-50 transition duration-150 ease-in-out">
-                                <div className="flex justify-between items-center">
-                                    <span className="font-semibold text-gray-900">{message.name}</span>
-                                    <span className="text-sm text-gray-500">{message.time}</span>
-                                </div>
-                                <p className="mt-1 text-sm text-gray-600">{message.message}</p>
-                            </li>
-                        })
+                </section>
+                <section
+                    className={' h-full transition-all overflow-x-hidden overflow-y-scroll box-border  flex flex-col gap-3  max-sm:flex-row max-sm:overflow-x-scroll py-5  max-sm:py-0'
+                        + (Object.keys(users).length > 1 ? " w-[300px] max-sm:w-full max-sm:h-[150px] px-2 " : " w-0 max-sm:h-0 ")
                     }
-                </ul>
-                <form onSubmit={e => {
-                    e.preventDefault();
-                    sendMessage();
-                }} className='w-full h-full flex justify-center items-center box-border px-3 '>
+                    id="usersParentSection"
+                >
+
+                    {Object.keys(users).map(key => {
+                        const user = users[key];
+                        if (key == "main") return;
+
+                        return <div
+                            className='flex-none sm:w-full box-border rounded-md bg-[#333] h-[100px] relative hover:scale-95 transition-all max-sm:h-full max-sm:w-[200px]'
+                            key={user.id}
+                            id={`id-${user.id}`}
+                            onClick={() => setMainStream(user.id)}
+                        >
+
+                            <p className='absolute bottom-2 left-2 text-lg'>
+                                {user.name}
+                                {user.id == socket.id ? " (You)" : ""}
+                            </p>
+                        </div>
+                    })}
+                </section>
+
+                <section
+                    className={'absolute right-0 h-full top-0 bg-[#fff] backdrop-blur-xl sm:rounded-l-xl  grid grid-rows-[50px_auto_75px] transition-all overflow-hidden '
+                        + (messagesSectionOpen ? "w-[400px] max-sm:w-full " : "w-0")
+
+                    }
+                >
 
 
-                    <Input
-                        placeholder='type message ...'
-                        ref={messageInputRef}
-                        className='bg-white text-black'
-                    />
-                    <Button
-                        type='submit'
-                    ><MdSend /></Button>
+                    <div className='h-full w-full flex justify-end '>
+                        <button
+                            onClick={() => setMessagesSectionOpen(false)}
+                            className='mr-5 text-2xl active:scale-90 text-black'
+                        ><MdClose /></button>
+                    </div>
+                    <ul className='w-full h-full flex flex-col gap-2'>
 
-                </form>
-            </section>
+                        {
+                            messagesList.map((message, index) => {
+                                return <li key={index} className="px-4 py-3 hover:bg-gray-50 transition duration-150 ease-in-out">
+                                    <div className="flex justify-between items-center">
+                                        <span className="font-semibold text-gray-900">{message.name}</span>
+                                        <span className="text-sm text-gray-500">{message.time}</span>
+                                    </div>
+                                    <p className="mt-1 text-sm text-gray-600">{message.message}</p>
+                                </li>
+                            })
+                        }
+                    </ul>
+                    <form onSubmit={e => {
+                        e.preventDefault();
+                        sendMessage();
+                    }} className='w-full h-full flex justify-center items-center box-border px-3 '>
 
-        </main>
+
+                        <Input
+                            placeholder='type message ...'
+                            ref={messageInputRef}
+                            className='bg-white text-black'
+                        />
+                        <Button
+                            type='submit'
+                        ><MdSend /></Button>
+
+                    </form>
+                </section>
+
+            </main>
+        </>
+
     )
 }

@@ -11,8 +11,12 @@ import { ToastContainer } from "react-toastify"
 function App() {
   // const api = "http://localhost:8000"
   // const api = "https://webrtc-conference.glitch.me"
-  const api = "https://quickmeet.publicvm.com"
+  const api = "https://quickmeet.work.gd"
   const socket = io(api, { autoConnect: false })
+  const queryParams = new URLSearchParams(location.search);
+  const room = queryParams.get('room')?.toString();
+
+
 
   return (
     <>
@@ -21,12 +25,21 @@ function App() {
         position="bottom-right"
         theme="dark"
       />
-      <BrowserRouter>
+
+      {room?.length ?
+        <Meet
+          socket={socket}
+          room={room}
+        />
+        :
+        <Room />
+      }
+      {/* <BrowserRouter>
         <Routes>
           <Route index element={<Room />} />
           <Route path='/:room' element={<Meet socket={socket} />} />
         </Routes>
-      </BrowserRouter>
+      </BrowserRouter> */}
 
     </>
   )

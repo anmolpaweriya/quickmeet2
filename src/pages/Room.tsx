@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom"
 import { v4 } from "uuid";
 
 // components
@@ -8,7 +7,6 @@ import { toast } from 'react-toastify';
 
 export default function Room() {
 
-    const navigate = useNavigate();
     const [roomId, setRoomId] = useState("")
 
 
@@ -19,7 +17,7 @@ export default function Room() {
             toast.error("Must provide room id")
             return
         }
-        navigate(`/${roomId}`)
+        window.location.href = window.location.origin + `?room=${roomId}`
     }
     async function createRoom(e: any) {
         e.preventDefault();
@@ -27,7 +25,7 @@ export default function Room() {
         toast.success("Room Created Successfully")
 
         setTimeout(() => {
-            navigate(`/${uid}`)
+            window.location.href = window.location.origin + `?room=${uid}`
         }, 500);
     }
 
