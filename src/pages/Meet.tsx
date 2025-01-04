@@ -19,8 +19,10 @@ import { InfinitySpin } from 'react-loader-spinner'
 import { FaMicrophone, FaMicrophoneSlash } from "react-icons/fa";
 import { IoCall } from "react-icons/io5";
 import { FaCopy } from "react-icons/fa6";
-import { MdDraw, MdMessage, MdClose, MdSend } from "react-icons/md";
+import { MdDraw, MdMessage, MdClose, MdSend, MdScreenShare } from "react-icons/md";
 import { BsFillCameraVideoFill, BsFillCameraVideoOffFill } from "react-icons/bs";
+import { Fullscreen } from 'lucide-react';
+
 
 
 
@@ -46,6 +48,8 @@ type messageType = {
     time: string
 }
 
+type connectionType = 'camera' | 'screen'
+
 
 export default function Meet({ socket, room }: { socket: Socket, room: string }) {
 
@@ -54,12 +58,16 @@ export default function Meet({ socket, room }: { socket: Socket, room: string })
     const peerConnections = useRef<peerConnectionsType>({})
     const trackSenders = useRef<trackSendersType>({})
     const localStream = useRef<MediaStream>()
+    const localScreenStream = useRef<MediaStream>()
+    const peerScreenShareConnections = useRef<peerConnectionsType>({})
+    const isScreenSharing = useRef<boolean>(false)
+
 
 
     const [users, setUsers] = useState<userType>({});
     const [username, setUsername] = useState("")
     const [constraints, setConstraints] = useState({ video: true, audio: false })
-    // const [screenShare, setScreenShare] = useState(false)
+    const [screenShare, setScreenShare] = useState(false)
     const [messagesSectionOpen, setMessagesSectionOpen] = useState(false)
     const [messagesList, setMessagesList] = useState<messageType[]>([])
 
@@ -140,6 +148,7 @@ export default function Meet({ socket, room }: { socket: Socket, room: string })
         addUser(id, name)
         socket.emit("user-connection-reply", id, username)
         toast(name + ' Joined')
+
     }
 
     async function handleUserConnectionReply(id: string, name: string) {
@@ -147,68 +156,91 @@ export default function Meet({ socket, room }: { socket: Socket, room: string })
         toast(name + ' Joined')
         await createConnection(id)
         await createOffer(id)
+
     }
 
     function handleUserDisconnected(id: string) {
         removeUser(id)
+        removeUser(`${id}-screen`)
     }
 
-
-    async function createConnection(id: string) {
-        const peer = new RTCPeerConnection({ iceServers });
-        peerConnections.current[id]?.close();
-        peerConnections.current[id] = peer
-
-        peer.ontrack = event => {
-            console.log(event.streams)
-            renderStream(id, event.streams[0])
-            addStreamToUser(id, event.streams[0])
-        }
-        peer.onicecandidate = event => {
-            if (event.candidate)
-                socket.emit('ice-candidate', JSON.stringify(event.candidate), id)
-        }
-
-
-        addTrackToSinglePeer(id)
+    function getPeerById(id: string, type: connectionType) {
+        let peer;
+        if (type == 'camera')
+            peer = peerConnections.current[id]
+        else
+            peer = peerScreenShareConnections.current[id]
         return peer
     }
 
-    async function createOffer(id: string) {
-        const peer = peerConnections.current[id]
+    async function createConnection(id: string, type: connectionType = 'camera') {
+        const peer = new RTCPeerConnection({ iceServers });
+        if (type == 'camera') {
+            peerConnections.current[id]?.close();
+            peerConnections.current[id] = peer
+        } else {
+            peerScreenShareConnections.current[id]?.close();
+            peerScreenShareConnections.current[id] = peer
+        }
+
+        peer.ontrack = event => {
+            let userId = id
+            if (type == 'screen')
+                userId = `${id}-screen`
+            renderStream(userId, event.streams[0])
+            addStreamToUser(userId, event.streams[0])
+        }
+        peer.onicecandidate = event => {
+            if (event.candidate)
+                socket.emit('ice-candidate', JSON.stringify(event.candidate), id, type)
+        }
+
+        if (type == 'camera')
+            addTrackToSinglePeer(id, 'camera')
+
+        return peer
+    }
+
+    async function createOffer(id: string, type: connectionType = 'camera') {
+        const peer = getPeerById(id, type)
         if (!peer) return
         try {
 
             const offer = await peer.createOffer()
             await peer.setLocalDescription(offer)
-            socket.emit('offer', JSON.stringify(offer), id)
+            socket.emit('offer', JSON.stringify(offer), id, type)
         } catch (err) {
             console.log(err)
         }
     }
 
-    async function handleOffer(offer: string, id: string) {
-        let peer = peerConnections.current[id]
+    async function handleOffer(offer: string, id: string, type: connectionType) {
+        let peer = getPeerById(id, type)
         if (!peer)
-            peer = await createConnection(id);
+            peer = await createConnection(id, type);
 
+        if (type == 'camera' && isScreenSharing.current)
+            startScreenShare()
 
 
         await peer.setRemoteDescription(new RTCSessionDescription(JSON.parse(offer)))
         const answer = await peer.createAnswer();
         await peer.setLocalDescription(new RTCSessionDescription(answer));
-        socket.emit("answer", JSON.stringify(answer), id)
+        socket.emit("answer", JSON.stringify(answer), id, type)
 
     }
 
-    function handleAnswer(answer: string, id: string) {
-        const peer = peerConnections.current[id]
+    function handleAnswer(answer: string, id: string, type: connectionType) {
+
+        const peer = getPeerById(id, type)
+        if (!peer) return
         peer.setRemoteDescription(new RTCSessionDescription(JSON.parse(answer)))
         console.log("connected")
     }
 
-    async function handleIceCandidate(candidate: string, id: string) {
-        const peer = peerConnections.current[id]
+    async function handleIceCandidate(candidate: string, id: string, type: connectionType) {
+        const peer = getPeerById(id, type)
+        if (!peer) return
         await peer.addIceCandidate(JSON.parse(candidate))
     }
 
@@ -219,6 +251,7 @@ export default function Meet({ socket, room }: { socket: Socket, room: string })
         const video = document.createElement('video')
         if (socket.id == id)
             video.muted = true
+        // video.controls = false
         video.onloadedmetadata = () => video.play()
         video.srcObject = stream
 
@@ -239,7 +272,6 @@ export default function Meet({ socket, room }: { socket: Socket, room: string })
     }
 
     async function startVideo() {
-
         localStream.current?.getTracks().forEach(function (track) {
             track.stop();
         });
@@ -261,20 +293,28 @@ export default function Meet({ socket, room }: { socket: Socket, room: string })
 
     function addTrackToAllPeers() {
         Object.keys(peerConnections.current)?.forEach(async (id: string) => {
-            await addTrackToSinglePeer(id)
+            await addTrackToSinglePeer(id, 'camera')
         })
     }
-    async function addTrackToSinglePeer(id: string) {
-        const peer = peerConnections.current[id]
+    async function addTrackToSinglePeer(id: string, type: connectionType = 'camera') {
+        const peer = getPeerById(id, type)
 
-        trackSenders.current[id]?.forEach(sender => {
+        let userId = id;
+        if (type == 'screen')
+            userId = `${id}-screen`
+
+        trackSenders.current[userId]?.forEach(sender => {
             peer.removeTrack(sender)
         })
-        trackSenders.current[id] = []
-        localStream.current?.getTracks().forEach(track => {
+        trackSenders.current[userId] = []
+
+        let stream = localStream.current;
+        if (type == 'screen')
+            stream = localScreenStream.current
+        stream?.getTracks().forEach(track => {
             try {
-                const sender = peer.addTrack(track, localStream.current!)
-                trackSenders.current[id].push(sender);
+                const sender = peer.addTrack(track, stream)
+                trackSenders.current[userId].push(sender);
             } catch (err) {
                 console.log(err)
             }
@@ -321,6 +361,96 @@ export default function Meet({ socket, room }: { socket: Socket, room: string })
 
     }
 
+    // screen share functions
+    async function toggleScreenShare() {
+        isScreenSharing.current = !isScreenSharing.current
+        startScreenShare()
+        setScreenShare(isScreenSharing.current)
+    }
+
+
+
+    async function startScreenShare() {
+
+        if (!socket.id) return
+        const id = `${socket.id}-screen`
+
+        if (!isScreenSharing.current) {
+            localScreenStream.current?.getTracks().forEach(function (track) {
+                track.stop();
+            });
+            localScreenStream.current = undefined
+            socket.emit('screen-share-stopped', room)
+            removeUser(id)
+        } else {
+            if (!localScreenStream.current) {
+                localScreenStream.current = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
+            }
+            addUser(id, `${username}(Screen)`)
+            socket.emit('screen-share-started', room, username)
+
+        }
+
+        addStreamToUser(id, localScreenStream.current)
+
+        addScreenTrackToPeers()
+    }
+
+    async function addScreenTrackToPeers() {
+        Object.keys(peerConnections.current).forEach(async (id: string) => {
+            if (!peerScreenShareConnections.current[id])
+                await createConnection(id, 'screen')
+        })
+
+        Object.keys(peerScreenShareConnections.current).forEach(async (id: string) => {
+            await addTrackToSinglePeer(id, 'screen')
+            await createOffer(id, 'screen')
+        })
+
+
+
+
+
+
+    }
+    async function handleScreenShareStart(id: string, name: string) {
+        addUser(`${id}-screen`, `${name}(Screen)`)
+    }
+    async function handleScreenShareStopped(id: string) {
+        removeUser(`${id}-screen`)
+    }
+
+
+    /* View in fullscreen */
+    function openFullscreen(elem: Element) {
+        if (elem.requestFullscreen) {
+            elem.requestFullscreen();
+        }
+    }
+
+    /* Close fullscreen */
+    function closeFullscreen() {
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        }
+    }
+
+    function toggleFullscreen() {
+        const elem = document.getElementById(`id-${users["main"]?.id}`)
+        if (!elem) return
+        elem.classList.toggle('fullScreenVideo')
+        if (
+            elem.classList.contains('fullScreenVideo')
+        ) {
+            openFullscreen(elem)
+        }
+        else
+            closeFullscreen()
+    }
+
+
+
+
 
 
 
@@ -339,7 +469,6 @@ export default function Meet({ socket, room }: { socket: Socket, room: string })
             if (socket.id)
                 addStreamToUser(socket.id, localStream.current)
 
-            // startVideo()
 
 
             // listeners
@@ -350,6 +479,8 @@ export default function Meet({ socket, room }: { socket: Socket, room: string })
             socket.on("answer", handleAnswer)
             socket.on("ice-candidate", handleIceCandidate)
             socket.on("stream-stopped", id => addStreamToUser(id, undefined))
+            socket.on("screen-share-started", handleScreenShareStart)
+            socket.on("screen-share-stopped", handleScreenShareStopped)
             socket.on("receive-message", (message: string, name: string) => {
                 setMessagesSectionOpen(pre => {
                     if (!pre)
@@ -358,6 +489,8 @@ export default function Meet({ socket, room }: { socket: Socket, room: string })
                 })
                 handleReceivedMessage(message, name)
             })
+
+
         })
 
         socket.connect()
@@ -412,8 +545,9 @@ export default function Meet({ socket, room }: { socket: Socket, room: string })
 
     return (
         <>
-            {!socket.connected &&
-                <div className='w-full h-full absolute top-0 left-0 z-10 bg-[#181818] flex justify-center items-center  '>
+            {!socket.connected
+                &&
+                <div className='w-full h-full absolute top-0 left-0 z-20 bg-[#181818] flex justify-center items-center  '>
                     <InfinitySpin
                         color='#fff'
 
@@ -436,15 +570,21 @@ export default function Meet({ socket, room }: { socket: Socket, room: string })
                                 {users["main"]?.name}
                                 {users["main"]?.id == socket.id ? " (You)" : ""}
                             </p>
+                            <button
+                                className=' absolute top-4 right-4 z-10 scale-125'
+                                onClick={toggleFullscreen}
+                            >
+                                <Fullscreen />
+                            </button>
                         </div>
                         <div className='w-full h-full flex justify-center items-center gap-5 max-sm:gap-3'>
-                            {/* <button className={'rounded-full w-[50px] h-[50px] flex justify-center items-center text-xl active:scale-95 transition-all ' +
-                            (screenShare ? "bg-blue-400 text-black" : "bg-[#444]")
-                        }
-                            onClick={toggleScreenShare}
-                        >
-                            <MdScreenShare />
-                        </button> */}
+                            <button className={'rounded-full w-[50px] h-[50px] flex justify-center items-center text-xl active:scale-95 transition-all max-sm:hidden ' +
+                                (screenShare ? "bg-blue-400 text-black" : "bg-[#444]")
+                            }
+                                onClick={toggleScreenShare}
+                            >
+                                <MdScreenShare />
+                            </button>
                             <button className={'rounded-full w-[50px] h-[50px] flex justify-center items-center text-xl active:scale-95 transition-all ' +
                                 (constraints.video ? "bg-blue-400 text-black" : "bg-[#444]")
                             }
@@ -523,7 +663,7 @@ export default function Meet({ socket, room }: { socket: Socket, room: string })
                 </section>
 
                 <section
-                    className={'absolute right-0 h-full top-0 bg-[#fff] backdrop-blur-xl sm:rounded-l-xl  grid grid-rows-[50px_auto_75px] transition-all overflow-hidden '
+                    className={'absolute right-0 h-full top-0 bg-[#fff] backdrop-blur-xl sm:rounded-l-xl  grid grid-rows-[50px_auto_75px] transition-all overflow-hidden z-20 '
                         + (messagesSectionOpen ? "w-[400px] max-sm:w-full " : "w-0")
 
                     }
