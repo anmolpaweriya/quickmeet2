@@ -10,7 +10,7 @@ import { ToastContainer } from "react-toastify"
 function App() {
   // const api = "http://localhost:8000"
   // const api = "https://webrtc-conference.glitch.me"
-  const api = "https://quickmeet.work.gd"
+  const api = "https://quickmeet.publicvm.com"
   const socket = io(api, { autoConnect: false })
   const queryParams = new URLSearchParams(location.search);
   const room = queryParams.get('room')?.toString();
