@@ -5,11 +5,14 @@ import { io } from "socket.io-client";
 import { ToastContainer } from "react-toastify";
 
 function App() {
-  // const api = "http://localhost:8000"
-  const api = "https://quickmeet.ddns.net";
-  // const api = "https://webrtc-conference.glitch.me"
+  // const api = "http://localhost:8000";
+  // const api = "https://quickmeet.ddns.net";
+  const api = "https://quickmeet2-backend.onrender.com";
   // const api = "https://quickmeet.publicvm.com"
-  const socket = io(api, { autoConnect: false });
+  const socket = io(api, {
+    autoConnect: false,
+    transports: ["websocket", "polling"],
+  });
   const queryParams = new URLSearchParams(location.search);
   const room = queryParams.get("room")?.toString();
 
