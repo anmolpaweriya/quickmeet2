@@ -7,8 +7,8 @@ import { ToastContainer } from "react-toastify";
 function App() {
   // const api = "http://localhost:8000";
   // const api = "https://quickmeet.ddns.net";
-  const api = "https://quickmeet2-backend.onrender.com";
-  // const api = "https://quickmeet.publicvm.com"
+  // const api = "https://quickmeet2-backend.onrender.com";
+  const api = "https://quickmeet.anmolpaweriya.online/";
   const socket = io(api, {
     autoConnect: false,
     transports: ["websocket", "polling"],
